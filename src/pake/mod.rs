@@ -93,7 +93,7 @@ mod tests {
     fn distinct_a_b_g() {
         assert_ne!(a_point(), b_point());
         assert_ne!(a_point(), RistrettoPoint::generator());
-        assert_ne!(a_point(), RistrettoPoint::generator());
+        assert_ne!(b_point(), RistrettoPoint::generator());
     }
 
     #[test]
