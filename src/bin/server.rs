@@ -1,22 +1,19 @@
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::{TcpListener, TcpStream};
+use axum::body::to_bytes;
+use axum::{Router, body::Body, response::IntoResponse, routing::post};
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:8080").await?;
-    print!("Server listening on {}", listener.local_addr()?);
+async fn main() {
+    // build our application with a single route
+    let app = Router::new().route("/message", post(handle_message));
 
-    loop {
-        let (socket, addr) = listener.accept().await?;
-        println!("New connection from {}", addr);
-        tokio::spawn(async move {
-            if let Err(e) = handle_connection(socket).await {
-                eprintln!("Error handling connection from {}: {}", addr, e);
-            }
-        });
-    }
+    println!("Listening on http://127.0.0.1:3000");
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
+async fn handle_message(body: Body) -> impl IntoResponse {
+    let bytes = to_bytes(body, 1024 * 1024).await.unwrap(); // 1 MB limit
+    println!("Server received: {:?}", bytes);
 
-async fn handle_connection(mut socket: TcpStream) -> tokio::io::Result<()> {
-    todo!("Implement server logic here");
+    // Example: just echo back with "ACK"
+    b"ACK".to_vec()
 }
