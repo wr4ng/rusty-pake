@@ -97,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn it_works() {
+    fn correct_password_same_key() {
         let idc = "client";
         let ids = "server";
         let password = "password123";
@@ -121,5 +121,34 @@ mod tests {
         let k_server = step_4(idc, ids, phi0, c, beta, u, v);
 
         assert_eq!(k_client, k_server);
+    }
+
+    #[test]
+    fn wrong_password_different_key() {
+        let idc = "client";
+        let ids = "server";
+        let password = "password123";
+        let wrong_password = "wrongpassword";
+
+        // Initial setup
+        let (phi0, phi1) = setup_1(password, idc, ids);
+        let (phi0, c) = setup_2(phi0, phi1);
+
+        // Wrang setup
+        let (phi0_wrong, phi1_wrong) = setup_1(wrong_password, idc, ids);
+
+        // Step 1: Client computes u with wrong phi0
+        let (u_wrong, alpha) = step_1(phi0_wrong);
+
+        // Step 2: Server computes v with correct saved password
+        let (v, beta) = step_2(phi0);
+
+        // Step 3: Client computes session key with wrong phi0 and phi1
+        let k_client = step_3(idc, ids, phi0_wrong, phi1_wrong, alpha, u_wrong, v);
+
+        // Step 4: Server computes session key with correct saved phi0 and c 
+        let k_server = step_4(idc, ids, phi0, c, beta, u_wrong, v);
+
+        assert_ne!(k_client, k_server);
     }
 }
