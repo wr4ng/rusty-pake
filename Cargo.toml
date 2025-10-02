@@ -4,7 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-curve25519-dalek = { version = "4", default-features = true, features = ["rand_core", "digest", "group"] }
+curve25519-dalek = { version = "4", default-features = true, features = [
+    "rand_core",
+    "digest",
+    "group",
+] }
 group = "0.13.0"
 rand = "0.8"
 sha2 = "0.10.9"
+tokio = { version = "1", features = ["full"] }
+axum = "0.8.6"
+reqwest = { version = "0.11", features = ["json", "blocking"] }
