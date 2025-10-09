@@ -1102,6 +1102,8 @@ dependencies = [
  "group",
  "rand",
  "reqwest",
+ "serde",
+ "serde_json",
  "sha2",
  "tokio",
 ]
