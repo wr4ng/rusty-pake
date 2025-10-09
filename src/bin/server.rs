@@ -4,16 +4,36 @@ use axum::{Router, body::Body, response::IntoResponse, routing::post};
 #[tokio::main]
 async fn main() {
     // build our application with a single route
-    let app = Router::new().route("/message", post(handle_message));
+    let app = Router::new()
+        .route("/message", post(handle_message))
+        .route("/setup", post(handle_setup))
+        .route("/login", post(handle_login));
 
     println!("Listening on http://127.0.0.1:3000");
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
+
 async fn handle_message(body: Body) -> impl IntoResponse {
     let bytes = to_bytes(body, 1024 * 1024).await.unwrap(); // 1 MB limit
     println!("Server received: {:?}", bytes);
 
     // Example: just echo back with "ACK"
     b"ACK".to_vec()
+}
+
+async fn handle_setup(body: Body) -> impl IntoResponse {
+    let bytes = to_bytes(body, 1024 * 1024).await.unwrap(); // 1 MB limit
+    println!("Setup received: {:?}", bytes);
+
+    // Placeholder response
+    b"Setup ACK".to_vec()
+}
+
+async fn handle_login(body: Body) -> impl IntoResponse {
+    let bytes = to_bytes(body, 1024 * 1024).await.unwrap(); // 1 MB limit
+    println!("Login received: {:?}", bytes);
+
+    // Placeholder response
+    b"Login ACK".to_vec()
 }
