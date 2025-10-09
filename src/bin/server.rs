@@ -2,7 +2,7 @@ use axum::body::to_bytes;
 use axum::routing::get;
 use axum::{Router, body::Body, http::StatusCode, response::IntoResponse, routing::post};
 use curve25519_dalek::Scalar;
-use rusty_pake::pake::setup_2;
+use rusty_pake::pake::client_cipher;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::env;
@@ -62,11 +62,11 @@ async fn handle_setup(body: Body) -> impl IntoResponse {
             let phi1 = Scalar::from_bytes_mod_order(request.phi1_bytes);
 
             // Execute setup_2 to generate c
-            let (phi0_result, c) = setup_2(phi0, phi1);
+            let c = client_cipher(phi1);
 
             // Create response
             let response = SetupResponse {
-                phi0_bytes: phi0_result.to_bytes(),
+                phi0_bytes: phi0.to_bytes(),
                 c_bytes: c.compress().to_bytes(),
             };
 

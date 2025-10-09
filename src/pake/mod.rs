@@ -11,7 +11,15 @@ fn b_point() -> RistrettoPoint {
     RistrettoPoint::hash_from_bytes::<Sha512>(b"B")
 }
 
-fn h_prime(phi0: Scalar, idc: &str, ids: &str, u: RistrettoPoint, v: RistrettoPoint, w: RistrettoPoint, d: RistrettoPoint) -> [u8; 32] {
+fn h_prime(
+    phi0: Scalar,
+    idc: &str,
+    ids: &str,
+    u: RistrettoPoint,
+    v: RistrettoPoint,
+    w: RistrettoPoint,
+    d: RistrettoPoint,
+) -> [u8; 32] {
     let mut hasher = Sha512::new();
     hasher.update(phi0.as_bytes());
     hasher.update(idc.as_bytes());
@@ -38,7 +46,7 @@ fn h(m: &[u8]) -> (Scalar, Scalar) {
     )
 }
 
-pub fn setup_1(password: &str, idc: &str, ids: &str) -> (Scalar, Scalar) {
+pub fn client_secret(password: &str, idc: &str, ids: &str) -> (Scalar, Scalar) {
     let mut hasher = Sha512::new();
     hasher.update(password.as_bytes());
     hasher.update(idc.as_bytes());
@@ -46,11 +54,12 @@ pub fn setup_1(password: &str, idc: &str, ids: &str) -> (Scalar, Scalar) {
     h(&hasher.finalize())
 }
 
-pub fn setup_2(phi0: Scalar, phi1: Scalar) -> (Scalar, RistrettoPoint) {
+pub fn client_cipher(phi1: Scalar) -> RistrettoPoint {
     let c = RistrettoPoint::generator() * phi1;
-    (phi0, c)
+    c
 }
-pub fn step_1(phi0: Scalar) -> (RistrettoPoint, Scalar) {
+
+pub fn client_initial(phi0: Scalar) -> (RistrettoPoint, Scalar) {
     let alpha = Scalar::random(&mut OsRng);
     if alpha == Scalar::ZERO {
         panic!("alpha should not be zero!");
@@ -61,7 +70,7 @@ pub fn step_1(phi0: Scalar) -> (RistrettoPoint, Scalar) {
     (u, alpha)
 }
 
-pub fn step_2(phi0: Scalar) -> (RistrettoPoint, Scalar) {
+pub fn server_initial(phi0: Scalar) -> (RistrettoPoint, Scalar) {
     let beta = Scalar::random(&mut OsRng);
     if beta == Scalar::ZERO {
         panic!("beta should not be zero!");
@@ -72,14 +81,30 @@ pub fn step_2(phi0: Scalar) -> (RistrettoPoint, Scalar) {
     (v, beta)
 }
 
-pub fn step_3(idc: &str, ids: &str, phi0: Scalar, phi1: Scalar, alpha: Scalar, u: RistrettoPoint, v: RistrettoPoint) -> [u8; 32] {
+pub fn client_compute_key(
+    idc: &str,
+    ids: &str,
+    phi0: Scalar,
+    phi1: Scalar,
+    alpha: Scalar,
+    u: RistrettoPoint,
+    v: RistrettoPoint,
+) -> [u8; 32] {
     let b = b_point();
     let w = (v - b * phi0) * alpha;
     let d = (v - b * phi0) * phi1;
     h_prime(phi0, idc, ids, u, v, w, d)
 }
 
-pub fn step_4(idc: &str, ids: &str, phi0: Scalar, c: RistrettoPoint, beta: Scalar, u: RistrettoPoint, v: RistrettoPoint) -> [u8; 32] {
+pub fn server_compute_key(
+    idc: &str,
+    ids: &str,
+    phi0: Scalar,
+    c: RistrettoPoint,
+    beta: Scalar,
+    u: RistrettoPoint,
+    v: RistrettoPoint,
+) -> [u8; 32] {
     let a = a_point();
     let w = (u - a * phi0) * beta;
     let d = c * beta;
@@ -103,22 +128,22 @@ mod tests {
         let password = "password123";
 
         // Initial setup
-        let (phi0, phi1) = setup_1(password, idc, ids);
-        let (phi0, c) = setup_2(phi0, phi1);
+        let (phi0, phi1) = client_secret(password, idc, ids);
+        let c = client_cipher(phi1);
 
         // Step 1: Client computes u
-        let (u, alpha) = step_1(phi0);
+        let (u, alpha) = client_initial(phi0);
 
         // Step 2: Server computes v
-        let (v, beta) = step_2(phi0);
+        let (v, beta) = server_initial(phi0);
 
         // Step 3: Client computes session key
         // Uses v from server
-        let k_client = step_3(idc, ids, phi0, phi1, alpha, u, v);
+        let k_client = client_compute_key(idc, ids, phi0, phi1, alpha, u, v);
 
         // Step 4: Server computes session key
         // Uses u from client and c from setup_2
-        let k_server = step_4(idc, ids, phi0, c, beta, u, v);
+        let k_server = server_compute_key(idc, ids, phi0, c, beta, u, v);
 
         assert_eq!(k_client, k_server);
     }
@@ -131,23 +156,23 @@ mod tests {
         let wrong_password = "wrongpassword";
 
         // Initial setup
-        let (phi0, phi1) = setup_1(password, idc, ids);
-        let (phi0, c) = setup_2(phi0, phi1);
+        let (phi0, phi1) = client_secret(password, idc, ids);
+        let c = client_cipher(phi1);
 
         // Wrang setup
-        let (phi0_wrong, phi1_wrong) = setup_1(wrong_password, idc, ids);
+        let (phi0_wrong, phi1_wrong) = client_secret(wrong_password, idc, ids);
 
         // Step 1: Client computes u with wrong phi0
-        let (u_wrong, alpha) = step_1(phi0_wrong);
+        let (u_wrong, alpha) = client_initial(phi0_wrong);
 
         // Step 2: Server computes v with correct saved password
-        let (v, beta) = step_2(phi0);
+        let (v, beta) = server_initial(phi0);
 
         // Step 3: Client computes session key with wrong phi0 and phi1
-        let k_client = step_3(idc, ids, phi0_wrong, phi1_wrong, alpha, u_wrong, v);
+        let k_client = client_compute_key(idc, ids, phi0_wrong, phi1_wrong, alpha, u_wrong, v);
 
-        // Step 4: Server computes session key with correct saved phi0 and c 
-        let k_server = step_4(idc, ids, phi0, c, beta, u_wrong, v);
+        // Step 4: Server computes session key with correct saved phi0 and c
+        let k_server = server_compute_key(idc, ids, phi0, c, beta, u_wrong, v);
 
         assert_ne!(k_client, k_server);
     }

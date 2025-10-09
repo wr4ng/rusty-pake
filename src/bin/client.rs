@@ -1,5 +1,5 @@
 use reqwest;
-use rusty_pake::pake::*;
+use rusty_pake::pake::client_secret;
 use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
 
@@ -58,7 +58,7 @@ async fn handle_setup(
     println!("Starting PAKE setup process...");
 
     // Generate phi0 and phi1 using setup_1
-    let (phi0, phi1) = setup_1(password, client_id, server_id);
+    let (phi0, phi1) = client_secret(password, client_id, server_id);
 
     // Create request data with serialized scalars
     let request = SetupRequest {
