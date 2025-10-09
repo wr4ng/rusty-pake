@@ -1,6 +1,7 @@
 use axum::body::to_bytes;
+use axum::routing::get;
 use axum::{Router, body::Body, http::StatusCode, response::IntoResponse, routing::post};
-use curve25519_dalek::{RistrettoPoint, Scalar}; // Is this needed here?
+use curve25519_dalek::Scalar;
 use rusty_pake::pake::*;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -20,23 +21,19 @@ struct SetupResponse {
 
 #[tokio::main]
 async fn main() {
-    // build our application with a single route
     let app = Router::new()
-        .route("/message", post(handle_message))
+        .route("/id", get(handle_id))
         .route("/setup", post(handle_setup))
-        .route("/login", post(handle_login));
+        .route("/login", post(handle_login))
+        .route("/verify", post(handle_verify));
 
     println!("Listening on http://127.0.0.1:3000");
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn handle_message(body: Body) -> impl IntoResponse {
-    let bytes = to_bytes(body, 1024 * 1024).await.unwrap(); // 1 MB limit
-    println!("Server received: {:?}", bytes);
-
-    // Example: just echo back with "ACK"
-    b"ACK".to_vec()
+async fn handle_id() {
+    todo!("implement verify")
 }
 
 async fn handle_setup(body: Body) -> impl IntoResponse {
@@ -92,4 +89,8 @@ async fn handle_login(body: Body) -> impl IntoResponse {
 
     // Placeholder response
     b"Login ACK".to_vec()
+}
+
+async fn handle_verify() {
+    todo!("implement verify")
 }

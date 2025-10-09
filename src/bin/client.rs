@@ -1,4 +1,3 @@
-use curve25519_dalek::{RistrettoPoint, Scalar}; // Is this needed here?
 use reqwest;
 use rusty_pake::pake::*;
 use serde::{Deserialize, Serialize};
