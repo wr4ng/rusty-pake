@@ -1,4 +1,5 @@
 use reqwest;
+use rusty_pake::pake::*;
 use std::io::{self, Write};
 
 #[tokio::main]
@@ -10,8 +11,11 @@ async fn main() {
     print!("Connecting to server at {}...\n", server);
     println!("Client ID: {}, Password: {}", client_id, password);
 
+    println!("Choose protocol state (message, setup or login)");
+    let protocol_state = prompt("Enter protocol state:");
+
     // connect to server given ip
-    let addr = format!("http://127.0.0.1:{}/message", server); // Fix
+    let addr = format!("http://127.0.0.1:{}/{}", server, protocol_state); // Fix
     let client = reqwest::Client::new();
     // send initial message to server
     let res = client.post(&addr).body("Hello from client").send().await;
