@@ -2,9 +2,10 @@ use axum::body::to_bytes;
 use axum::routing::get;
 use axum::{Router, body::Body, http::StatusCode, response::IntoResponse, routing::post};
 use curve25519_dalek::Scalar;
-use rusty_pake::pake::*;
+use rusty_pake::pake::setup_2;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use std::env;
 
 #[derive(Serialize, Deserialize)]
 struct SetupRequest {
@@ -21,6 +22,15 @@ struct SetupResponse {
 
 #[tokio::main]
 async fn main() {
+    let id = match env::var("SERVER_ID") {
+        Ok(id) => id,
+        Err(_) => {
+            eprintln!("No SERVER_ID provided!");
+            return;
+        }
+    };
+    println!("starting server with id: {}", &id);
+
     let app = Router::new()
         .route("/id", get(handle_id))
         .route("/setup", post(handle_setup))
