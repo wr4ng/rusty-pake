@@ -55,8 +55,7 @@ pub fn client_secret(password: &str, idc: &str, ids: &str) -> (Scalar, Scalar) {
 }
 
 pub fn client_cipher(phi1: Scalar) -> RistrettoPoint {
-    let c = RistrettoPoint::generator() * phi1;
-    c
+    RistrettoPoint::generator() * phi1
 }
 
 pub fn client_initial(phi0: Scalar) -> (RistrettoPoint, Scalar) {
