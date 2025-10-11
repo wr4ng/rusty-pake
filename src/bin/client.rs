@@ -6,11 +6,13 @@ use std::io::{self, Write};
 
 #[tokio::main]
 async fn main() {
-    let server_ip = prompt("Enter server IP");
-    let client_id = prompt("Enter client ID");
-    let password = prompt("Enter password");
+    let server_ip = prompt("Enter server IP (http://localhost:3000):")
+        .unwrap_or("http://localhost:3000".into());
+    let client_id = prompt("Enter client ID:").expect("need to provide client id!");
+    let password = prompt("Enter password:").expect("need to enter password!");
 
-    let protocol_state = prompt("\nChoose protocol state (setup or login)");
+    let protocol_state =
+        prompt("\nChoose protocol state (setup or login):").expect("empty protocol");
     match protocol_state.as_str() {
         "setup" => {
             if let Err(e) = handle_setup(&server_ip, &client_id, &password).await {
@@ -32,11 +34,10 @@ async fn handle_setup(
 ) -> Result<(), anyhow::Error> {
     println!("Starting PAKE setup process...");
 
-    //TODO: Get server id from server_ip/id
-    let server_id = "id";
+    let server_id = get_server_id(server_ip).await?;
 
     // Perform client setup
-    let (phi0, phi1) = client_secret(password, client_id, server_id);
+    let (phi0, phi1) = client_secret(password, client_id, &server_id);
     let c = client_cipher(phi1);
 
     // Create request
@@ -68,10 +69,20 @@ async fn handle_setup(
     }
 }
 
-fn prompt(msg: &str) -> String {
-    print!("{}: ", msg);
+async fn get_server_id(server_ip: &str) -> Result<String, anyhow::Error> {
+    let client = reqwest::Client::new();
+    let response = client.get(format!("{}/id", server_ip)).send().await?;
+    let id = response.text().await?;
+    Ok(id)
+}
+
+fn prompt(msg: &str) -> Option<String> {
+    print!("{}", msg);
     io::stdout().flush().unwrap();
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    input.trim().to_string()
+    match input.trim() {
+        "" => None,
+        s => Some(s.into()),
+    }
 }
