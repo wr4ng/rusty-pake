@@ -1,6 +1,8 @@
+use curve25519_dalek::ristretto::CompressedRistretto;
+
 use rusty_pake::{
-    pake::{client_cipher, client_secret},
-    shared::SetupRequest,
+    pake::{client_cipher, client_secret, client_initial, client_compute_key},
+    shared::{SetupRequest, LoginRequest, LoginResponse},
 };
 use std::io::{self, Write};
 
@@ -19,13 +21,17 @@ async fn main() {
                 eprintln!("Error during setup: {}", e);
             }
         }
-        "login" => todo!("implement login"),
+        "login" => {
+            if let Err(e) = handle_login(&server_ip, &client_id, &password).await {
+                eprintln!("Error during login: {}", e);
+            }
+        }
         _ => {
             eprintln!("invalid protocol state. Choose 'setup' or 'login'");
             return;
         }
     }
-}
+}   
 
 async fn handle_setup(
     server_ip: &str,
@@ -67,6 +73,44 @@ async fn handle_setup(
     } else {
         anyhow::bail!("Server returned error: {}", res.status());
     }
+}
+
+async fn handle_login(server_ip: &str, idc: &str, password: &str) -> Result<(), anyhow::Error> {
+    // fetch server id
+    let id_s = get_server_id(server_ip).await?;
+
+    // client secrets & initial message
+    let (phi0, phi1) = client_secret(password, idc, &id_s);
+    let (u_point, alpha) = client_initial(phi0);
+
+    // POST /login with hex(u)
+    let req = LoginRequest {
+        id: idc.to_string(),
+        u: hex::encode(u_point.compress().to_bytes()),
+    };
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{}/login", server_ip))
+        .json(&req)
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        anyhow::bail!("server returned {}", resp.status());
+    }
+
+    // parse response and compute k on client
+    let lr: LoginResponse = resp.json().await?;
+    let v_bytes = hex::decode(lr.v)?;
+    let v_point = CompressedRistretto::from_slice(&v_bytes)
+        .map_err(|_| anyhow::anyhow!("bad v length"))?
+        .decompress()
+        .ok_or_else(|| anyhow::anyhow!("bad v point"))?;
+
+    let k_c = client_compute_key(idc, &id_s, phi0, phi1, alpha, u_point, v_point);
+    println!("Login OK. Session key (client) = {}", hex::encode(k_c));
+    Ok(())
 }
 
 async fn get_server_id(server_ip: &str) -> Result<String, anyhow::Error> {

@@ -4,7 +4,8 @@ use axum::routing::get;
 use axum::{Router, http::StatusCode, response::IntoResponse, routing::post};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::{RistrettoPoint, Scalar};
-use rusty_pake::shared::SetupRequest;
+use rusty_pake::pake::{server_initial, server_compute_key};
+use rusty_pake::shared::{SetupRequest, LoginRequest, LoginResponse};
 use std::collections::HashMap;
 use std::env;
 use std::sync::{Arc, Mutex};
@@ -83,8 +84,31 @@ async fn handle_setup(
     StatusCode::OK
 }
 
-async fn handle_login() {
-    todo!("implement login")
+
+async fn handle_login(
+    State(state): State<AppState>,
+    Json(req): Json<LoginRequest>,
+) -> Result<Json<LoginResponse>, StatusCode> {
+    let mut sessions = state.sessions.lock().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let sess = sessions.get_mut(&req.id).ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // decode u
+    let u_bytes = hex::decode(&req.u).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let u_comp  = CompressedRistretto::from_slice(&u_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let u_point = u_comp.decompress().ok_or(StatusCode::BAD_REQUEST)?;
+
+    // server step
+    let (v_point, beta) = server_initial(sess.phi0);
+
+    // derive key
+    let idc = &req.id;
+    let ids = &state.id;
+    let k_s = server_compute_key(idc, ids, sess.phi0, sess.c, beta, u_point, v_point);
+    sess.key = Some(k_s);
+
+    let v_hex = hex::encode(v_point.compress().to_bytes());
+    Ok(Json(LoginResponse { v: v_hex, id_s: state.id.clone() }))
 }
 
 async fn handle_verify() {

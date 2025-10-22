@@ -18,6 +18,19 @@ pub enum DecodeError {
     InvalidLength(String),
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct LoginRequest {
+    pub id: String,     // username
+    pub u: String,      // hex(CompressedRistretto)
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct LoginResponse {
+    pub v: String,      // hex(CompressedRistretto)
+    pub id_s: String,   // server identifier (plain)
+}
+
+
 impl SetupRequest {
     pub fn new(id: String, phi0: &[u8; 32], c: &[u8; 32]) -> Self {
         Self {
