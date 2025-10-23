@@ -10,47 +10,62 @@ use std::io::{self, Write};
 async fn main() {
     let server_ip = prompt("Enter server IP (http://localhost:3000):")
         .unwrap_or("http://localhost:3000".into());
-    let client_id = prompt("Enter client ID:").expect("need to provide client id!");
 
-    let protocol_state =
-        prompt("\nChoose protocol state (setup or login):").expect("empty protocol");
-    match protocol_state.as_str() {
-        "setup" => {
-            let password = prompt("Enter password:").expect("need to enter password!");
-            if let Err(e) = handle_setup(&server_ip, &client_id, &password).await {
-                eprintln!("Error during setup: {}", e);
-            }
-        }
-        "login" => {
-            let password = prompt("Enter password:").expect("need to enter password!");
-            if let Err(e) = handle_login(&server_ip, &client_id, &password).await {
-                eprintln!("Error during login: {}", e);
-            }
-        }
-        "verify" => {
-            let key = prompt("Enter key:").expect("need to enter key!");
-            if let Err(e) = handle_verify(&server_ip, &client_id, key).await {
-                eprintln!("Error during login: {}", e);
-            }
-        }
-        _ => {
-            eprintln!("invalid protocol state. Choose 'setup' or 'login'");
+    let server_id = match get_server_id(&server_ip).await {
+        Ok(ip) => ip,
+        Err(e) => {
+            eprintln!("Failed to get server id: {:?}", e);
             return;
+        }
+    };
+
+    loop {
+        let protocol_state =
+            prompt("\nAction (setup, login, verify, exit):").expect("empty protocol");
+        match protocol_state.as_str() {
+            "setup" => {
+                let client_id = prompt("Enter client ID:").expect("need to provide client id!");
+                let password = prompt("Enter password:").expect("need to enter password!");
+                if let Err(e) = handle_setup(&server_ip, &server_id, &client_id, &password).await {
+                    eprintln!("Error during setup: {}", e);
+                }
+            }
+            "login" => {
+                //TODO: Save key to reuse in verify
+                let client_id = prompt("Enter client ID:").expect("need to provide client id!");
+                let password = prompt("Enter password:").expect("need to enter password!");
+                if let Err(e) = handle_login(&server_ip, &server_id, &client_id, &password).await {
+                    eprintln!("Error during login: {}", e);
+                }
+            }
+            "verify" => {
+                let client_id = prompt("Enter client ID:").expect("need to provide client id!");
+                let key = prompt("Enter key:").expect("need to enter key!");
+                if let Err(e) = handle_verify(&server_ip, &client_id, key).await {
+                    eprintln!("Error during login: {}", e);
+                }
+            }
+            "exit" => {
+                return;
+            }
+            _ => {
+                eprintln!("invalid protocol state. Choose 'setup' or 'login'");
+                return;
+            }
         }
     }
 }
 
 async fn handle_setup(
     server_ip: &str,
+    server_id: &str,
     client_id: &str,
     password: &str,
 ) -> Result<(), anyhow::Error> {
     println!("Starting PAKE setup process...");
 
-    let server_id = get_server_id(server_ip).await?;
-
     // Perform client setup
-    let (phi0, phi1) = client_secret(password, client_id, &server_id);
+    let (phi0, phi1) = client_secret(password, client_id, server_id);
     let c = client_cipher(phi1);
 
     // Create request
@@ -78,12 +93,14 @@ async fn handle_setup(
     }
 }
 
-async fn handle_login(server_ip: &str, idc: &str, password: &str) -> Result<(), anyhow::Error> {
-    // fetch server id
-    let id_s = get_server_id(server_ip).await?;
-
+async fn handle_login(
+    server_ip: &str,
+    server_id: &str,
+    idc: &str,
+    password: &str,
+) -> Result<(), anyhow::Error> {
     // client secrets & initial message
-    let (phi0, phi1) = client_secret(password, idc, &id_s);
+    let (phi0, phi1) = client_secret(password, idc, server_id);
     let (u_point, alpha) = client_initial(phi0);
 
     // POST /login with hex(u)
@@ -111,7 +128,7 @@ async fn handle_login(server_ip: &str, idc: &str, password: &str) -> Result<(), 
         .decompress()
         .ok_or_else(|| anyhow::anyhow!("bad v point"))?;
 
-    let k_c = client_compute_key(idc, &id_s, phi0, phi1, alpha, u_point, v_point);
+    let k_c = client_compute_key(idc, server_id, phi0, phi1, alpha, u_point, v_point);
     println!("Login completed\nkey={}", hex::encode(k_c));
     Ok(())
 }
