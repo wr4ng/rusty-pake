@@ -2,7 +2,7 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 
 use rusty_pake::{
     pake::{client_cipher, client_compute_key, client_initial, client_secret},
-    shared::{LoginRequest, LoginResponse, SetupRequest, VerifyRequest},
+    shared::{LoginRequest, LoginResponse, SetupRequest, VerifyRequestEncoded},
 };
 use std::io::{self, Write};
 
@@ -54,14 +54,10 @@ async fn handle_setup(
     let c = client_cipher(phi1);
 
     // Create request
-    let request = SetupRequest::new(
-        client_id.to_string(),
-        &phi0.to_bytes(),
-        &c.compress().to_bytes(),
-    );
+    let request = SetupRequest::new(client_id.to_string(), phi0, c);
 
     // Serialize to JSON
-    let json = serde_json::to_string(&request)?;
+    let json = serde_json::to_string(&request.encode())?;
     println!("Sending setup request to server...");
 
     // Send to server
@@ -121,7 +117,7 @@ async fn handle_login(server_ip: &str, idc: &str, password: &str) -> Result<(), 
 }
 
 async fn handle_verify(server_ip: &str, idc: &str, key: String) -> Result<(), anyhow::Error> {
-    let request = VerifyRequest::new(idc.to_string(), key);
+    let request = VerifyRequestEncoded::new(idc.to_string(), key);
 
     let client = reqwest::Client::new();
     let response = client

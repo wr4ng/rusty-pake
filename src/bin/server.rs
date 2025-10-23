@@ -5,7 +5,7 @@ use axum::{Router, http::StatusCode, response::IntoResponse, routing::post};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use rusty_pake::pake::{server_compute_key, server_initial};
-use rusty_pake::shared::{LoginRequest, LoginResponse, SetupRequest, VerifyRequest};
+use rusty_pake::shared::{LoginRequest, LoginResponse, SetupRequestEncoded, VerifyRequestEncoded};
 use std::collections::HashMap;
 use std::env;
 use std::sync::{Arc, Mutex};
@@ -50,38 +50,33 @@ async fn handle_id(State(state): State<AppState>) -> impl IntoResponse {
 
 async fn handle_setup(
     State(state): State<AppState>,
-    Json(request): Json<SetupRequest>,
-) -> impl IntoResponse {
+    Json(request): Json<SetupRequestEncoded>,
+) -> Result<(), StatusCode> {
     let mut sessions = match state.sessions.lock() {
         Ok(s) => s,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+        _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
-    let (id, phi0, c) = request.decode().unwrap(); // TODO: Handle errors
-    println!("Setup request received from client ID: {}", &id);
+    println!(
+        "Setup request received\nid={}\nphi0={:?}\nc={:?}",
+        request.id, request.phi0, request.c,
+    );
 
-    println!("phi0={:?}\nc={:?}", phi0, c);
+    let request = request.decode().map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let phi0 = Scalar::from_bytes_mod_order(phi0);
-    let c = CompressedRistretto::from_slice(&c)
-        .unwrap()
-        .decompress()
-        .unwrap(); // TODO: Handle errors
-
-    if sessions.contains_key(&id) {
+    if sessions.contains_key(&request.id) {
         //TODO: Handle client trying to setup again
-        return StatusCode::INTERNAL_SERVER_ERROR;
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
     sessions.insert(
-        id,
+        request.id,
         Session {
-            phi0: phi0,
-            c: c,
+            phi0: request.phi0,
+            c: request.c,
             key: None,
         },
     );
-
-    StatusCode::OK
+    Ok(())
 }
 
 async fn handle_login(
@@ -118,18 +113,18 @@ async fn handle_login(
 
 async fn handle_verify(
     State(state): State<AppState>,
-    Json(request): Json<VerifyRequest>,
+    Json(request): Json<VerifyRequestEncoded>,
 ) -> Result<(), StatusCode> {
     let sessions = state
         .sessions
         .lock()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let (idc, key) = request.decode().map_err(|_| StatusCode::BAD_REQUEST)?;
-    let client_session = sessions.get(&idc).ok_or(StatusCode::BAD_REQUEST)?;
+    let request = request.decode().map_err(|_| StatusCode::BAD_REQUEST)?;
+    let client_session = sessions.get(&request.idc).ok_or(StatusCode::BAD_REQUEST)?;
     let stored_key = client_session.key.ok_or(StatusCode::BAD_REQUEST)?;
 
-    if !(stored_key == key) {
+    if !(stored_key == request.key) {
         return Err(StatusCode::UNAUTHORIZED);
     }
     Ok(())

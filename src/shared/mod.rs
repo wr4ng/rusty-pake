@@ -1,13 +1,7 @@
+use curve25519_dalek::{RistrettoPoint, Scalar, ristretto::CompressedRistretto};
 use hex::FromHexError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-#[derive(Serialize, Deserialize)]
-pub struct SetupRequest {
-    id: String,
-    phi0: String,
-    c: String,
-}
 
 #[derive(Debug, Error)]
 pub enum DecodeError {
@@ -16,6 +10,62 @@ pub enum DecodeError {
 
     #[error("invalid byte length: {0}")]
     InvalidLength(String),
+
+    #[error("invalid Ristretto point")]
+    InvalidPoint,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SetupRequestEncoded {
+    pub id: String,
+    pub phi0: String,
+    pub c: String,
+}
+
+pub struct SetupRequest {
+    pub id: String,
+    pub phi0: Scalar,
+    pub c: RistrettoPoint,
+}
+
+impl SetupRequestEncoded {
+    pub fn decode(self) -> Result<SetupRequest, DecodeError> {
+        let phi0_bytes = hex::decode(&self.phi0)?;
+        let c_bytes = hex::decode(&self.c)?;
+
+        let phi0_bytes: [u8; 32] = phi0_bytes
+            .try_into()
+            .map_err(|_| DecodeError::InvalidLength("phi0".into()))?;
+
+        let phi0 = Scalar::from_bytes_mod_order(phi0_bytes);
+        let c = match CompressedRistretto::from_slice(&c_bytes) {
+            Ok(compressed) => match compressed.decompress() {
+                Some(c) => c,
+                None => return Err(DecodeError::InvalidPoint),
+            },
+            _ => return Err(DecodeError::InvalidLength("c".into())),
+        };
+
+        Ok(SetupRequest {
+            id: self.id,
+            phi0,
+            c,
+        })
+    }
+}
+
+impl SetupRequest {
+    pub fn new(id: String, phi0: Scalar, c: RistrettoPoint) -> Self {
+        Self { id, phi0, c }
+    }
+
+    pub fn encode(self) -> SetupRequestEncoded {
+        SetupRequestEncoded {
+            id: self.id,
+            phi0: hex::encode(self.phi0.to_bytes()),
+            c: hex::encode(self.c.compress().to_bytes()),
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -30,42 +80,28 @@ pub struct LoginResponse {
     pub id_s: String, // server identifier (plain)
 }
 
-impl SetupRequest {
-    pub fn new(id: String, phi0: &[u8; 32], c: &[u8; 32]) -> Self {
-        Self {
-            id,
-            phi0: hex::encode(phi0),
-            c: hex::encode(c),
-        }
-    }
-
-    pub fn decode(self) -> Result<(String, [u8; 32], [u8; 32]), DecodeError> {
-        let phi0 = hex::decode(&self.phi0)?;
-        let c = hex::decode(&self.c)?;
-        match (phi0.try_into(), c.try_into()) {
-            (Ok(phi0), Ok(c)) => Ok((self.id, phi0, c)),
-            (Err(_), _) => Err(DecodeError::InvalidLength("phi0".into())),
-            (_, Err(_)) => Err(DecodeError::InvalidLength("c".into())),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
-pub struct VerifyRequest {
+pub struct VerifyRequestEncoded {
     pub idc: String,
     pub key: String,
 }
 
-impl VerifyRequest {
+pub struct VerifyRequest {
+    pub idc: String,
+    pub key: [u8; 32],
+}
+
+impl VerifyRequestEncoded {
+    // Assumes key is a valid hex string representing [u8; 32]
     pub fn new(idc: String, key: String) -> Self {
         Self { idc, key }
     }
 
-    pub fn decode(self) -> Result<(String, [u8; 32]), DecodeError> {
+    pub fn decode(self) -> Result<VerifyRequest, DecodeError> {
         let key = hex::decode(self.key)?;
         let key = key
             .try_into()
             .map_err(|_| DecodeError::InvalidLength("key".into()))?;
-        Ok((self.idc, key))
+        Ok(VerifyRequest { idc: self.idc, key })
     }
 }
