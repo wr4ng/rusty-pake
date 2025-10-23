@@ -20,16 +20,15 @@ pub enum DecodeError {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct LoginRequest {
-    pub id: String,     // username
-    pub u: String,      // hex(CompressedRistretto)
+    pub id: String, // username
+    pub u: String,  // hex(CompressedRistretto)
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct LoginResponse {
-    pub v: String,      // hex(CompressedRistretto)
-    pub id_s: String,   // server identifier (plain)
+    pub v: String,    // hex(CompressedRistretto)
+    pub id_s: String, // server identifier (plain)
 }
-
 
 impl SetupRequest {
     pub fn new(id: String, phi0: &[u8; 32], c: &[u8; 32]) -> Self {
@@ -48,5 +47,25 @@ impl SetupRequest {
             (Err(_), _) => Err(DecodeError::InvalidLength("phi0".into())),
             (_, Err(_)) => Err(DecodeError::InvalidLength("c".into())),
         }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct VerifyRequest {
+    pub idc: String,
+    pub key: String,
+}
+
+impl VerifyRequest {
+    pub fn new(idc: String, key: String) -> Self {
+        Self { idc, key }
+    }
+
+    pub fn decode(self) -> Result<(String, [u8; 32]), DecodeError> {
+        let key = hex::decode(self.key)?;
+        let key = key
+            .try_into()
+            .map_err(|_| DecodeError::InvalidLength("key".into()))?;
+        Ok((self.idc, key))
     }
 }

@@ -1,8 +1,8 @@
 use curve25519_dalek::ristretto::CompressedRistretto;
 
 use rusty_pake::{
-    pake::{client_cipher, client_secret, client_initial, client_compute_key},
-    shared::{SetupRequest, LoginRequest, LoginResponse},
+    pake::{client_cipher, client_compute_key, client_initial, client_secret},
+    shared::{LoginRequest, LoginResponse, SetupRequest, VerifyRequest},
 };
 use std::io::{self, Write};
 
@@ -11,18 +11,25 @@ async fn main() {
     let server_ip = prompt("Enter server IP (http://localhost:3000):")
         .unwrap_or("http://localhost:3000".into());
     let client_id = prompt("Enter client ID:").expect("need to provide client id!");
-    let password = prompt("Enter password:").expect("need to enter password!");
 
     let protocol_state =
         prompt("\nChoose protocol state (setup or login):").expect("empty protocol");
     match protocol_state.as_str() {
         "setup" => {
+            let password = prompt("Enter password:").expect("need to enter password!");
             if let Err(e) = handle_setup(&server_ip, &client_id, &password).await {
                 eprintln!("Error during setup: {}", e);
             }
         }
         "login" => {
+            let password = prompt("Enter password:").expect("need to enter password!");
             if let Err(e) = handle_login(&server_ip, &client_id, &password).await {
+                eprintln!("Error during login: {}", e);
+            }
+        }
+        "verify" => {
+            let key = prompt("Enter key:").expect("need to enter key!");
+            if let Err(e) = handle_verify(&server_ip, &client_id, key).await {
                 eprintln!("Error during login: {}", e);
             }
         }
@@ -31,7 +38,7 @@ async fn main() {
             return;
         }
     }
-}   
+}
 
 async fn handle_setup(
     server_ip: &str,
@@ -109,7 +116,25 @@ async fn handle_login(server_ip: &str, idc: &str, password: &str) -> Result<(), 
         .ok_or_else(|| anyhow::anyhow!("bad v point"))?;
 
     let k_c = client_compute_key(idc, &id_s, phi0, phi1, alpha, u_point, v_point);
-    println!("Login OK. Session key (client) = {}", hex::encode(k_c));
+    println!("Login completed\nkey={}", hex::encode(k_c));
+    Ok(())
+}
+
+async fn handle_verify(server_ip: &str, idc: &str, key: String) -> Result<(), anyhow::Error> {
+    let request = VerifyRequest::new(idc.to_string(), key);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/verify", server_ip))
+        .json(&request)
+        .send()
+        .await?;
+
+    match response.status().is_success() {
+        true => println!("Verification successful"),
+        false => println!("Verification failed!"),
+    }
+
     Ok(())
 }
 

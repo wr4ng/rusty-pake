@@ -4,8 +4,8 @@ use axum::routing::get;
 use axum::{Router, http::StatusCode, response::IntoResponse, routing::post};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::{RistrettoPoint, Scalar};
-use rusty_pake::pake::{server_initial, server_compute_key};
-use rusty_pake::shared::{SetupRequest, LoginRequest, LoginResponse};
+use rusty_pake::pake::{server_compute_key, server_initial};
+use rusty_pake::shared::{LoginRequest, LoginResponse, SetupRequest, VerifyRequest};
 use std::collections::HashMap;
 use std::env;
 use std::sync::{Arc, Mutex};
@@ -84,18 +84,20 @@ async fn handle_setup(
     StatusCode::OK
 }
 
-
 async fn handle_login(
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
-    let mut sessions = state.sessions.lock().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut sessions = state
+        .sessions
+        .lock()
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let sess = sessions.get_mut(&req.id).ok_or(StatusCode::UNAUTHORIZED)?;
 
     // decode u
     let u_bytes = hex::decode(&req.u).map_err(|_| StatusCode::BAD_REQUEST)?;
-    let u_comp  = CompressedRistretto::from_slice(&u_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let u_comp = CompressedRistretto::from_slice(&u_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
     let u_point = u_comp.decompress().ok_or(StatusCode::BAD_REQUEST)?;
 
     // server step
@@ -108,9 +110,27 @@ async fn handle_login(
     sess.key = Some(k_s);
 
     let v_hex = hex::encode(v_point.compress().to_bytes());
-    Ok(Json(LoginResponse { v: v_hex, id_s: state.id.clone() }))
+    Ok(Json(LoginResponse {
+        v: v_hex,
+        id_s: state.id.clone(),
+    }))
 }
 
-async fn handle_verify() {
-    todo!("implement verify")
+async fn handle_verify(
+    State(state): State<AppState>,
+    Json(request): Json<VerifyRequest>,
+) -> Result<(), StatusCode> {
+    let sessions = state
+        .sessions
+        .lock()
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let (idc, key) = request.decode().map_err(|_| StatusCode::BAD_REQUEST)?;
+    let client_session = sessions.get(&idc).ok_or(StatusCode::BAD_REQUEST)?;
+    let stored_key = client_session.key.ok_or(StatusCode::BAD_REQUEST)?;
+
+    if !(stored_key == key) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    Ok(())
 }
