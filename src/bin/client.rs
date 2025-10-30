@@ -8,39 +8,52 @@ use std::io::{self, Write};
 
 #[tokio::main]
 async fn main() {
-    let server_ip = prompt("Enter server IP (http://localhost:3000):")
-        .unwrap_or("http://localhost:3000".into());
+    let server_ip = prompt_default("Enter server IP", "http://localhost:3000");
 
     let server_id = match get_server_id(&server_ip).await {
-        Ok(ip) => ip,
+        Ok(id) => id,
         Err(e) => {
             eprintln!("Failed to get server id: {:?}", e);
             return;
         }
     };
 
+    let mut saved_id: Option<String> = None;
+    let mut saved_key: Option<String> = None;
+
     loop {
-        let protocol_state =
-            prompt("\nAction (setup, login, verify, exit):").expect("empty protocol");
-        match protocol_state.as_str() {
+        let action = prompt("\nAction (setup, login, verify, exit):").unwrap_or("".into());
+        match action.as_str() {
             "setup" => {
-                let client_id = prompt("Enter client ID:").expect("need to provide client id!");
+                let client_id = prompt_saved("Enter client ID:", saved_id.as_deref())
+                    .expect("need to provide client id!");
+                saved_id = Some(client_id.clone());
                 let password = prompt("Enter password:").expect("need to enter password!");
                 if let Err(e) = handle_setup(&server_ip, &server_id, &client_id, &password).await {
                     eprintln!("Error during setup: {}", e);
                 }
             }
             "login" => {
-                //TODO: Save key to reuse in verify
-                let client_id = prompt("Enter client ID:").expect("need to provide client id!");
+                let client_id = prompt_saved("Enter client ID:", saved_id.as_deref())
+                    .expect("need to provide client id!");
+                saved_id = Some(client_id.clone());
                 let password = prompt("Enter password:").expect("need to enter password!");
-                if let Err(e) = handle_login(&server_ip, &server_id, &client_id, &password).await {
-                    eprintln!("Error during login: {}", e);
+
+                match handle_login(&server_ip, &server_id, &client_id, &password).await {
+                    Ok(key) => {
+                        saved_key = Some(key);
+                    }
+                    Err(e) => {
+                        eprintln!("Error during login: {}", e);
+                    }
                 }
             }
             "verify" => {
-                let client_id = prompt("Enter client ID:").expect("need to provide client id!");
-                let key = prompt("Enter key:").expect("need to enter key!");
+                let client_id = prompt_saved("Enter client ID:", saved_id.as_deref())
+                    .expect("need to provide client id!");
+                saved_id = Some(client_id.clone());
+                let key =
+                    prompt_saved("Enter key", saved_key.as_deref()).expect("need to enter key!");
                 if let Err(e) = handle_verify(&server_ip, &client_id, key).await {
                     eprintln!("Error during login: {}", e);
                 }
@@ -98,7 +111,7 @@ async fn handle_login(
     server_id: &str,
     idc: &str,
     password: &str,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     // client secrets & initial message
     let (phi0, phi1) = client_secret(password, idc, server_id);
     let (u_point, alpha) = client_initial(phi0);
@@ -129,8 +142,9 @@ async fn handle_login(
         .ok_or_else(|| anyhow::anyhow!("bad v point"))?;
 
     let k_c = client_compute_key(idc, server_id, phi0, phi1, alpha, u_point, v_point);
-    println!("Login completed\nkey={}", hex::encode(k_c));
-    Ok(())
+    let key = hex::encode(k_c);
+    println!("Login completed\nkey={}", key);
+    Ok(key)
 }
 
 async fn handle_verify(server_ip: &str, idc: &str, key: String) -> Result<(), anyhow::Error> {
@@ -166,5 +180,16 @@ fn prompt(msg: &str) -> Option<String> {
     match input.trim() {
         "" => None,
         s => Some(s.into()),
+    }
+}
+
+fn prompt_default(msg: &str, default: &str) -> String {
+    prompt(&format!("{} ({}):", msg, default)).unwrap_or(default.to_string())
+}
+
+fn prompt_saved(msg: &str, saved: Option<&str>) -> Option<String> {
+    match saved {
+        Some(saved) => Some(prompt_default(msg, saved)),
+        None => prompt(msg),
     }
 }
