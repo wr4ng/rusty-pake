@@ -1,4 +1,6 @@
+pub mod client;
 pub mod pake;
+pub mod server;
 pub mod shared;
 
 #[cfg(test)]
