@@ -68,16 +68,81 @@ impl SetupRequest {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Serialize, Deserialize)]
+pub struct LoginRequestEncoded {
+    pub id: String,
+    pub u: String,
+}
+
 pub struct LoginRequest {
-    pub id: String, // username
-    pub u: String,  // hex(CompressedRistretto)
+    pub id: String,
+    pub u: RistrettoPoint,
+}
+
+impl LoginRequestEncoded {
+    pub fn decode(self) -> Result<LoginRequest, DecodeError> {
+        let u_bytes = hex::decode(&self.u)?;
+
+        let u = match CompressedRistretto::from_slice(&u_bytes) {
+            Ok(c) => match c.decompress() {
+                Some(u) => u,
+                None => return Err(DecodeError::InvalidPoint),
+            },
+            Err(_) => return Err(DecodeError::InvalidLength("u".into())),
+        };
+
+        Ok(LoginRequest { id: self.id, u })
+    }
+}
+
+impl LoginRequest {
+    pub fn new(id: String, u: RistrettoPoint) -> Self {
+        Self { id, u }
+    }
+
+    pub fn encode(self) -> LoginRequestEncoded {
+        LoginRequestEncoded {
+            id: self.id,
+            u: hex::encode(self.u.compress().to_bytes()),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct LoginResponseEncoded {
+    pub v: String,
+}
+
 pub struct LoginResponse {
-    pub v: String,    // hex(CompressedRistretto)
-    pub id_s: String, // server identifier (plain)
+    pub v: RistrettoPoint,
+}
+
+impl LoginResponseEncoded {
+    pub fn decode(self) -> Result<LoginResponse, DecodeError> {
+        let v_bytes = hex::decode(&self.v)?;
+
+        let v = match CompressedRistretto::from_slice(&v_bytes) {
+            Ok(c) => match c.decompress() {
+                Some(u) => u,
+                None => return Err(DecodeError::InvalidPoint),
+            },
+            Err(_) => return Err(DecodeError::InvalidLength("u".into())),
+        };
+
+        Ok(LoginResponse { v })
+    }
+}
+
+impl LoginResponse {
+    pub fn new(v: RistrettoPoint) -> Self {
+        Self { v }
+    }
+
+    pub fn encode(self) -> LoginResponseEncoded {
+        LoginResponseEncoded {
+            v: hex::encode(self.v.compress().to_bytes()),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

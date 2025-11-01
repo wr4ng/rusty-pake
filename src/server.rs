@@ -10,13 +10,16 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
-use curve25519_dalek::{RistrettoPoint, Scalar, ristretto::CompressedRistretto};
+use curve25519_dalek::{RistrettoPoint, Scalar};
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
 use crate::{
     pake::{server_compute_key, server_initial},
-    shared::{LoginRequest, LoginResponse, SetupRequestEncoded, VerifyRequestEncoded},
+    shared::{
+        LoginRequestEncoded, LoginResponse, LoginResponseEncoded, SetupRequestEncoded,
+        VerifyRequestEncoded,
+    },
 };
 
 #[derive(Clone)]
@@ -62,25 +65,30 @@ async fn handle_setup(
     let mut sessions = match state.sessions.lock() {
         Ok(s) => s,
         _ => {
-            error!("failed to lock sessions");
+            error!("/setup failed to lock sessions");
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
-    info!(id = %request.id, phi0 = %request.phi0, c = %request.c, "/setup");
-
     let request = match request.decode() {
         Ok(r) => r,
         Err(error) => {
-            error!(%error, "failed to decode request");
+            error!(%error, "/setup failed to decode request");
             return Err(StatusCode::BAD_REQUEST);
         }
     };
 
     if sessions.contains_key(&request.id) {
-        error!(id = %request.id, "client id is already setup");
+        error!(id = %request.id, "/setup client id is already setup");
         return Err(StatusCode::BAD_GATEWAY);
     }
+
+    info!(
+        id = %request.id,
+        phi0 = %hex::encode(request.phi0.as_bytes()),
+        c = %hex::encode(request.c.compress().as_bytes()),
+        "/setup completed"
+    );
 
     sessions.insert(
         request.id,
@@ -95,42 +103,53 @@ async fn handle_setup(
 
 async fn handle_login(
     State(state): State<AppState>,
-    Json(request): Json<LoginRequest>,
-) -> Result<Json<LoginResponse>, StatusCode> {
+    Json(request): Json<LoginRequestEncoded>,
+) -> Result<Json<LoginResponseEncoded>, StatusCode> {
     let mut sessions = match state.sessions.lock() {
         Ok(s) => s,
         _ => {
-            error!("failed to lock sessions");
+            error!("/login failed to lock sessions");
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
-    info!(id = %request.id, u = %request.u, "/login");
-
     let session = sessions.get_mut(&request.id).ok_or_else(|| {
-        info!(id = %request.id, "client session not found");
+        info!(id = %request.id, "/login client session not found");
         StatusCode::UNAUTHORIZED
     })?;
 
-    // decode u
-    let u_bytes = hex::decode(&request.u).map_err(|_| StatusCode::BAD_REQUEST)?;
-    let u_comp = CompressedRistretto::from_slice(&u_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
-    let u_point = u_comp.decompress().ok_or(StatusCode::BAD_REQUEST)?;
+    let request = match request.decode() {
+        Ok(r) => r,
+        Err(error) => {
+            error!(%error, "/login failed to decode request");
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    };
 
     // server step
-    let (v_point, beta) = server_initial(session.phi0);
+    let (v, beta) = server_initial(session.phi0);
+    info!(
+        id = %request.id,
+        u = %hex::encode(request.u.compress().as_bytes()),
+        v = %hex::encode(v.compress().as_bytes()),
+        beta = %hex::encode(beta.as_bytes()),
+        "/login completed"
+    );
 
     // derive key
-    let idc = &request.id;
-    let ids = &state.id;
-    let k_s = server_compute_key(idc, ids, session.phi0, session.c, beta, u_point, v_point);
+    let k_s = server_compute_key(
+        &request.id,
+        &state.id,
+        session.phi0,
+        session.c,
+        beta,
+        request.u,
+        v,
+    );
+    // store key in client session
     session.key = Some(k_s);
 
-    let v_hex = hex::encode(v_point.compress().to_bytes());
-    Ok(Json(LoginResponse {
-        v: v_hex,
-        id_s: state.id.clone(),
-    }))
+    Ok(Json(LoginResponse::new(v).encode()))
 }
 
 async fn handle_verify(
@@ -140,21 +159,21 @@ async fn handle_verify(
     let sessions = match state.sessions.lock() {
         Ok(s) => s,
         _ => {
-            error!("failed to lock sessions");
+            error!("/verify failed to lock sessions");
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
     let client_session = sessions.get(&request.idc).ok_or_else(|| {
-        info!(id = %request.idc, "client session not found");
+        info!(id = %request.idc, "/verify client session not found");
         StatusCode::BAD_REQUEST
     })?;
     let stored_key = client_session.key.ok_or_else(|| {
-        info!(id = %request.idc, "not key stored for client");
+        info!(id = %request.idc, "/verify not key stored for client");
         StatusCode::BAD_REQUEST
     })?;
     let request = request.decode().map_err(|error| {
-        info!(%error, "failed to decode request");
+        info!(%error, "/verify failed to decode request");
         StatusCode::BAD_REQUEST
     })?;
 
@@ -163,11 +182,11 @@ async fn handle_verify(
             id = %request.idc,
             provided_key = %hex::encode(request.key),
             stored_key = %hex::encode(stored_key),
-            "verification failed!"
+            "/verify verification failed!"
         );
 
         return Err(StatusCode::UNAUTHORIZED);
     }
-    info!(id = %request.idc, "verification succeeded");
+    info!(id = %request.idc, "/verify verification succeeded");
     Ok(())
 }

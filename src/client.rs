@@ -1,5 +1,3 @@
-use curve25519_dalek::ristretto;
-
 use crate::{pake, shared};
 
 pub async fn get_server_id(server_ip: &str) -> Result<String, anyhow::Error> {
@@ -54,36 +52,34 @@ pub async fn perform_login(
 ) -> Result<String, anyhow::Error> {
     // client secrets & initial message
     let (phi0, phi1) = pake::client_secret(password, idc, server_id);
-    let (u_point, alpha) = pake::client_initial(phi0);
+    let (u, alpha) = pake::client_initial(phi0);
 
     // POST /login with hex(u)
-    let req = shared::LoginRequest {
-        id: idc.to_string(),
-        u: hex::encode(u_point.compress().to_bytes()),
-    };
+    let request = shared::LoginRequest::new(idc.to_string(), u);
 
     let client = reqwest::Client::new();
-    let resp = client
+    let response = client
         .post(format!("{}/login", server_ip))
-        .json(&req)
+        .json(&request.encode())
         .send()
         .await?;
 
-    if !resp.status().is_success() {
-        anyhow::bail!("server returned {}", resp.status());
+    if !response.status().is_success() {
+        anyhow::bail!("server returned {}", response.status());
     }
 
     // parse response and compute k on client
-    let lr: shared::LoginResponse = resp.json().await?;
-    let v_bytes = hex::decode(lr.v)?;
-    let v_point = ristretto::CompressedRistretto::from_slice(&v_bytes)
-        .map_err(|_| anyhow::anyhow!("bad v length"))?
-        .decompress()
-        .ok_or_else(|| anyhow::anyhow!("bad v point"))?;
+    let response: shared::LoginResponseEncoded = response.json().await?;
+    let response = response.decode()?;
 
-    let k_c = pake::client_compute_key(idc, server_id, phi0, phi1, alpha, u_point, v_point);
+    let k_c = pake::client_compute_key(idc, server_id, phi0, phi1, alpha, u, response.v);
     let key = hex::encode(k_c);
-    println!("Login completed\nkey={}", key);
+    println!(
+        "Login completed\nalpha={}\nu={}\nkey={}",
+        hex::encode(alpha.as_bytes()),
+        hex::encode(u.compress().as_bytes()),
+        key
+    );
     Ok(key)
 }
 
