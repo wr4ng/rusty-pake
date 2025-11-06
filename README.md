@@ -46,3 +46,9 @@ A non-interactive example client can be run against the local server using:
 cargo run --bin=example-client
 ```
 This runs an example flow where a client performs setup, exchange and verification against the server.
+
+
+This runs multiple clients with multiple rounds of exchange to test the server in a harder scenario:
+```shell
+cargo run --bin=example-many-clients
+```
