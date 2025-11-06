@@ -37,7 +37,12 @@ pub async fn perform_setup(
 
     // Handle response
     if res.status().is_success() {
-        println!("Setup completed successfully!");
+        println!(
+            "Setup completed\nphi0={}\nphi1={}\nc={}\n",
+            hex::encode(phi0.as_bytes()),
+            hex::encode(phi1.as_bytes()),
+            hex::encode(c.compress().as_bytes()),
+        );
         Ok(())
     } else {
         anyhow::bail!("Server returned error: {}", res.status());
@@ -75,7 +80,7 @@ pub async fn perform_exchange(
     let k_c = spake2plus::client_compute_key(idc, server_id, phi0, phi1, alpha, u, response.v);
     let key = hex::encode(k_c);
     println!(
-        "Exchange completed\nalpha={}\nu={}\nkey={}",
+        "Exchange completed\nalpha={}\nu={}\nkey={}\n",
         hex::encode(alpha.as_bytes()),
         hex::encode(u.compress().as_bytes()),
         key
@@ -96,8 +101,8 @@ pub async fn perform_verify(server_ip: &str, idc: &str, key: &str) -> Result<boo
     let success = response.status().is_success();
 
     match success {
-        true => println!("Verification successful"),
-        false => println!("Verification failed!"),
+        true => println!("Verification successful\n"),
+        false => println!("Verification failed!\n"),
     }
 
     Ok(success)

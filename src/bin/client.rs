@@ -12,12 +12,14 @@ async fn main() {
             return;
         }
     };
+    println!("Retrieved server id: {}", &server_id);
 
     let mut saved_id: Option<String> = None;
     let mut saved_key: Option<String> = None;
 
+    println!();
     loop {
-        let action = prompt("\nAction (setup, exchange, verify, exit):").unwrap_or("".into());
+        let action = prompt("Action (setup, exchange, verify, exit):").unwrap_or("".into());
         match action.as_str() {
             "setup" => {
                 let client_id = prompt_saved("Enter client ID:", saved_id.as_deref())
