@@ -15,11 +15,11 @@ use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
 use crate::{
-    pake::{server_compute_key, server_initial},
     shared::{
         LoginRequestEncoded, LoginResponse, LoginResponseEncoded, SetupRequestEncoded,
         VerifyRequestEncoded,
     },
+    spake2plus::{server_compute_key, server_initial},
 };
 
 #[derive(Clone)]

@@ -1,4 +1,4 @@
-use crate::{pake, shared};
+use crate::{shared, spake2plus};
 
 pub async fn get_server_id(server_ip: &str) -> Result<String, anyhow::Error> {
     let client = reqwest::Client::new();
@@ -16,8 +16,8 @@ pub async fn perform_setup(
     println!("Starting PAKE setup process...");
 
     // Perform client setup
-    let (phi0, phi1) = pake::client_secret(password, client_id, server_id);
-    let c = pake::client_cipher(phi1);
+    let (phi0, phi1) = spake2plus::client_secret(password, client_id, server_id);
+    let c = spake2plus::client_cipher(phi1);
 
     // Create request
     let request = shared::SetupRequest::new(client_id.to_string(), phi0, c);
@@ -51,8 +51,8 @@ pub async fn perform_login(
     password: &str,
 ) -> Result<String, anyhow::Error> {
     // client secrets & initial message
-    let (phi0, phi1) = pake::client_secret(password, idc, server_id);
-    let (u, alpha) = pake::client_initial(phi0);
+    let (phi0, phi1) = spake2plus::client_secret(password, idc, server_id);
+    let (u, alpha) = spake2plus::client_initial(phi0);
 
     // POST /login with hex(u)
     let request = shared::LoginRequest::new(idc.to_string(), u);
@@ -72,7 +72,7 @@ pub async fn perform_login(
     let response: shared::LoginResponseEncoded = response.json().await?;
     let response = response.decode()?;
 
-    let k_c = pake::client_compute_key(idc, server_id, phi0, phi1, alpha, u, response.v);
+    let k_c = spake2plus::client_compute_key(idc, server_id, phi0, phi1, alpha, u, response.v);
     let key = hex::encode(k_c);
     println!(
         "Login completed\nalpha={}\nu={}\nkey={}",

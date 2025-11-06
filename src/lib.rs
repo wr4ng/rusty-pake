@@ -1,5 +1,5 @@
 pub mod client;
-pub mod pake;
+pub mod spake2plus;
 pub mod server;
 pub mod shared;
 
