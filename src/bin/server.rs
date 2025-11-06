@@ -4,6 +4,10 @@ use std::env;
 #[tokio::main]
 async fn main() {
     let id = env::var("SERVER_ID").unwrap_or("SPAKE2+".into());
+    let port = env::var("PORT")
+        .map(|p| p.parse::<u32>().unwrap())
+        .unwrap_or(3000);
+
     println!("starting server with id: {}", &id);
 
     tracing_subscriber::fmt()
@@ -11,5 +15,5 @@ async fn main() {
         .compact()
         .init();
 
-    run("0.0.0.0:3000", &id).await;
+    run(port, &id).await;
 }

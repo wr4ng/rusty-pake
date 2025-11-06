@@ -17,7 +17,7 @@ async fn setup_server(id: &str) {
     });
 
     tokio::spawn(async move {
-        server::run("0.0.0.0:3000", &id).await;
+        server::run(3000, &id).await;
     });
 
     let client = reqwest::Client::new();

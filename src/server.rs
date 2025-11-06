@@ -34,7 +34,7 @@ struct Session {
     key: Option<[u8; 32]>,
 }
 
-pub async fn run(address: &str, id: &str) {
+pub async fn run(port: u32, id: &str) {
     let appstate = AppState {
         id: id.to_string(),
         sessions: Arc::new(Mutex::new(HashMap::new())),
@@ -48,6 +48,7 @@ pub async fn run(address: &str, id: &str) {
         .with_state(appstate)
         .layer(TraceLayer::new_for_http());
 
+    let address = format!("0.0.0.0:{}", port);
     println!("listening on http://{}", address);
     let listener = tokio::net::TcpListener::bind(address).await.unwrap();
     axum::serve(listener, app).await.unwrap();

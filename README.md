@@ -41,13 +41,13 @@ Then enter `setup` and afterwards an id and password.
 Using the same id and password in `exchange` yields a key that is the same the server computes.
 Can be verified using `verify`.
 
-The server id can be controlled using the `SERVER_ID` environment variable:
+The server id can be controlled using the `SERVER_ID` environment variable,
+and the port using the `PORT` environment variable:
 ```shell
-SERVER_ID=some-other-id cargo run --bin=server
-````
+SERVER_ID=some-other-id PORT=4242 cargo run --bin=server
+```
 
-We also provide the following example clients that run against the local server using
-predefined options. These require the server to be running locally in a separate process:
+We also provide the following binaries as exmaple clients that run against the local server using predefined options. These require the server to be running locally in a separate process. These expect the default port (3000) and server id (SPAKE2+).
 
 ```shell
 cargo run --bin=example-client        # A single client setup, exchange and verification
