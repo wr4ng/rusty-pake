@@ -17,7 +17,7 @@ async fn main() {
     let mut saved_key: Option<String> = None;
 
     loop {
-        let action = prompt("\nAction (setup, login, verify, exit):").unwrap_or("".into());
+        let action = prompt("\nAction (setup, exchange, verify, exit):").unwrap_or("".into());
         match action.as_str() {
             "setup" => {
                 let client_id = prompt_saved("Enter client ID:", saved_id.as_deref())
@@ -30,18 +30,19 @@ async fn main() {
                     eprintln!("Error during setup: {}", e);
                 }
             }
-            "login" => {
+            "exchange" => {
                 let client_id = prompt_saved("Enter client ID:", saved_id.as_deref())
                     .expect("need to provide client id!");
                 saved_id = Some(client_id.clone());
                 let password = prompt("Enter password:").expect("need to enter password!");
 
-                match client::perform_login(&server_ip, &server_id, &client_id, &password).await {
+                match client::perform_exchange(&server_ip, &server_id, &client_id, &password).await
+                {
                     Ok(key) => {
                         saved_key = Some(key);
                     }
                     Err(e) => {
-                        eprintln!("Error during login: {}", e);
+                        eprintln!("Error during exchange: {}", e);
                     }
                 }
             }
@@ -52,14 +53,14 @@ async fn main() {
                 let key =
                     prompt_saved("Enter key", saved_key.as_deref()).expect("need to enter key!");
                 if let Err(e) = client::perform_verify(&server_ip, &client_id, &key).await {
-                    eprintln!("Error during login: {}", e);
+                    eprintln!("Error during exchange: {}", e);
                 }
             }
             "exit" => {
                 return;
             }
             _ => {
-                eprintln!("invalid protocol state. Choose 'setup' or 'login'");
+                eprintln!("invalid protocol state");
                 return;
             }
         }

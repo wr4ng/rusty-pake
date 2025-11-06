@@ -16,7 +16,7 @@ use tracing::{error, info};
 
 use crate::{
     shared::{
-        LoginRequestEncoded, LoginResponse, LoginResponseEncoded, SetupRequestEncoded,
+        ExchangeRequestEncoded, ExchangeResponse, ExchangeResponseEncoded, SetupRequestEncoded,
         VerifyRequestEncoded,
     },
     spake2plus::{server_compute_key, server_initial},
@@ -43,7 +43,7 @@ pub async fn run(address: &str, id: &str) {
     let app = Router::new()
         .route("/id", get(handle_id))
         .route("/setup", post(handle_setup))
-        .route("/login", post(handle_login))
+        .route("/exchange", post(handle_exchange))
         .route("/verify", post(handle_verify))
         .with_state(appstate)
         .layer(TraceLayer::new_for_http());
@@ -101,27 +101,27 @@ async fn handle_setup(
     Ok(())
 }
 
-async fn handle_login(
+async fn handle_exchange(
     State(state): State<AppState>,
-    Json(request): Json<LoginRequestEncoded>,
-) -> Result<Json<LoginResponseEncoded>, StatusCode> {
+    Json(request): Json<ExchangeRequestEncoded>,
+) -> Result<Json<ExchangeResponseEncoded>, StatusCode> {
     let mut sessions = match state.sessions.lock() {
         Ok(s) => s,
         _ => {
-            error!("/login failed to lock sessions");
+            error!("/exchange failed to lock sessions");
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
     let session = sessions.get_mut(&request.id).ok_or_else(|| {
-        info!(id = %request.id, "/login client session not found");
+        info!(id = %request.id, "/exchange client session not found");
         StatusCode::UNAUTHORIZED
     })?;
 
     let request = match request.decode() {
         Ok(r) => r,
         Err(error) => {
-            error!(%error, "/login failed to decode request");
+            error!(%error, "/exchange failed to decode request");
             return Err(StatusCode::BAD_REQUEST);
         }
     };
@@ -133,7 +133,7 @@ async fn handle_login(
         u = %hex::encode(request.u.compress().as_bytes()),
         v = %hex::encode(v.compress().as_bytes()),
         beta = %hex::encode(beta.as_bytes()),
-        "/login completed"
+        "/exchange completed"
     );
 
     // derive key
@@ -149,7 +149,7 @@ async fn handle_login(
     // store key in client session
     session.key = Some(k_s);
 
-    Ok(Json(LoginResponse::new(v).encode()))
+    Ok(Json(ExchangeResponse::new(v).encode()))
 }
 
 async fn handle_verify(

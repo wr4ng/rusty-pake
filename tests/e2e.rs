@@ -42,7 +42,7 @@ async fn test_get_server_id() {
 
 #[tokio::test]
 #[serial]
-async fn test_successful_login() {
+async fn test_successful_exchange() {
     let ip = "http://localhost:3000";
     let server_id = "id";
     let client_id = "Alice";
@@ -54,7 +54,7 @@ async fn test_successful_login() {
         .await
         .unwrap();
 
-    let key = client::perform_login(ip, server_id, client_id, password)
+    let key = client::perform_exchange(ip, server_id, client_id, password)
         .await
         .unwrap();
 
@@ -63,7 +63,7 @@ async fn test_successful_login() {
 
 #[tokio::test]
 #[serial]
-async fn test_wrong_password_login() {
+async fn test_wrong_password_exchange() {
     let ip = "http://localhost:3000";
     let server_id = "id";
     let client_id = "Bob";
@@ -76,7 +76,7 @@ async fn test_wrong_password_login() {
         .unwrap();
 
     let wrong_password = "alice1234oops";
-    let key = client::perform_login(ip, server_id, client_id, wrong_password)
+    let key = client::perform_exchange(ip, server_id, client_id, wrong_password)
         .await
         .unwrap();
 
@@ -106,13 +106,13 @@ async fn test_multiple_clients() {
         .await
         .unwrap();
 
-    // Alice login
-    let key_a = client::perform_login(ip, server_id, client_a, password_a)
+    // Alice exchange
+    let key_a = client::perform_exchange(ip, server_id, client_a, password_a)
         .await
         .unwrap();
 
-    // Bob login
-    let key_b = client::perform_login(ip, server_id, client_b, password_b)
+    // Bob exchange
+    let key_b = client::perform_exchange(ip, server_id, client_b, password_b)
         .await
         .unwrap();
 

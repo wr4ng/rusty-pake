@@ -12,7 +12,7 @@ async fn main() {
         .await
         .unwrap();
 
-    let key = client::perform_login(ip, server_id, client_id, password)
+    let key = client::perform_exchange(ip, server_id, client_id, password)
         .await
         .unwrap();
 

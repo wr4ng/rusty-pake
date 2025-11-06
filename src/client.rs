@@ -44,7 +44,7 @@ pub async fn perform_setup(
     }
 }
 
-pub async fn perform_login(
+pub async fn perform_exchange(
     server_ip: &str,
     server_id: &str,
     idc: &str,
@@ -54,12 +54,12 @@ pub async fn perform_login(
     let (phi0, phi1) = spake2plus::client_secret(password, idc, server_id);
     let (u, alpha) = spake2plus::client_initial(phi0);
 
-    // POST /login with hex(u)
-    let request = shared::LoginRequest::new(idc.to_string(), u);
+    // POST /exchange with hex(u)
+    let request = shared::ExchangeRequest::new(idc.to_string(), u);
 
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/login", server_ip))
+        .post(format!("{}/exchange", server_ip))
         .json(&request.encode())
         .send()
         .await?;
@@ -69,13 +69,13 @@ pub async fn perform_login(
     }
 
     // parse response and compute k on client
-    let response: shared::LoginResponseEncoded = response.json().await?;
+    let response: shared::ExchangeResponseEncoded = response.json().await?;
     let response = response.decode()?;
 
     let k_c = spake2plus::client_compute_key(idc, server_id, phi0, phi1, alpha, u, response.v);
     let key = hex::encode(k_c);
     println!(
-        "Login completed\nalpha={}\nu={}\nkey={}",
+        "Exchange completed\nalpha={}\nu={}\nkey={}",
         hex::encode(alpha.as_bytes()),
         hex::encode(u.compress().as_bytes()),
         key

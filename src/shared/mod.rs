@@ -69,18 +69,18 @@ impl SetupRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct LoginRequestEncoded {
+pub struct ExchangeRequestEncoded {
     pub id: String,
     pub u: String,
 }
 
-pub struct LoginRequest {
+pub struct ExchangeRequest {
     pub id: String,
     pub u: RistrettoPoint,
 }
 
-impl LoginRequestEncoded {
-    pub fn decode(self) -> Result<LoginRequest, DecodeError> {
+impl ExchangeRequestEncoded {
+    pub fn decode(self) -> Result<ExchangeRequest, DecodeError> {
         let u_bytes = hex::decode(&self.u)?;
 
         let u = match CompressedRistretto::from_slice(&u_bytes) {
@@ -91,17 +91,17 @@ impl LoginRequestEncoded {
             Err(_) => return Err(DecodeError::InvalidLength("u".into())),
         };
 
-        Ok(LoginRequest { id: self.id, u })
+        Ok(ExchangeRequest { id: self.id, u })
     }
 }
 
-impl LoginRequest {
+impl ExchangeRequest {
     pub fn new(id: String, u: RistrettoPoint) -> Self {
         Self { id, u }
     }
 
-    pub fn encode(self) -> LoginRequestEncoded {
-        LoginRequestEncoded {
+    pub fn encode(self) -> ExchangeRequestEncoded {
+        ExchangeRequestEncoded {
             id: self.id,
             u: hex::encode(self.u.compress().to_bytes()),
         }
@@ -109,16 +109,16 @@ impl LoginRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct LoginResponseEncoded {
+pub struct ExchangeResponseEncoded {
     pub v: String,
 }
 
-pub struct LoginResponse {
+pub struct ExchangeResponse {
     pub v: RistrettoPoint,
 }
 
-impl LoginResponseEncoded {
-    pub fn decode(self) -> Result<LoginResponse, DecodeError> {
+impl ExchangeResponseEncoded {
+    pub fn decode(self) -> Result<ExchangeResponse, DecodeError> {
         let v_bytes = hex::decode(&self.v)?;
 
         let v = match CompressedRistretto::from_slice(&v_bytes) {
@@ -129,17 +129,17 @@ impl LoginResponseEncoded {
             Err(_) => return Err(DecodeError::InvalidLength("u".into())),
         };
 
-        Ok(LoginResponse { v })
+        Ok(ExchangeResponse { v })
     }
 }
 
-impl LoginResponse {
+impl ExchangeResponse {
     pub fn new(v: RistrettoPoint) -> Self {
         Self { v }
     }
 
-    pub fn encode(self) -> LoginResponseEncoded {
-        LoginResponseEncoded {
+    pub fn encode(self) -> ExchangeResponseEncoded {
+        ExchangeResponseEncoded {
             v: hex::encode(self.v.compress().to_bytes()),
         }
     }
