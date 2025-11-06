@@ -86,6 +86,39 @@ async fn test_wrong_password_exchange() {
 
 #[tokio::test]
 #[serial]
+async fn test_multiple_exchanges() {
+    let ip = "http://localhost:3000";
+    let server_id = "popular-server";
+    let client_id = "Bob";
+    let password = "alice1234";
+
+    setup_server(server_id).await;
+
+    client::perform_setup(ip, server_id, client_id, password)
+        .await
+        .unwrap();
+
+    // Exchange 1
+    let key1 = client::perform_exchange(ip, server_id, client_id, password)
+        .await
+        .unwrap();
+
+    let success1 = client::perform_verify(ip, client_id, &key1).await.unwrap();
+
+    // Exchange 2
+    let key2 = client::perform_exchange(ip, server_id, client_id, password)
+        .await
+        .unwrap();
+
+    let success2 = client::perform_verify(ip, client_id, &key2).await.unwrap();
+
+    assert!(success1);
+    assert!(success2);
+    assert_ne!(key1, key2);
+}
+
+#[tokio::test]
+#[serial]
 async fn test_multiple_clients() {
     let ip = "http://localhost:3000";
     let server_id = "id";
