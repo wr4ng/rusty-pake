@@ -11,12 +11,13 @@ The following setup steps have been tested on a Ubunto 24.04.3 LTS (slightly new
 2. Update packages and install project dependencies:
 ```shell
 sudo apt update && sudo apt upgrade -y
-sudo apt install git curl build-essential openssl libssl-dev pkg-config -y
+sudo apt install git curl build-essential libssl-dev pkg-config -y
 ```
 3. Install `rust` as per the [installation instructions](https://rust-lang.org/learn/get-started/):
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
+The shell needs to be restarted to make `cargo` available.
 4. Clone the project:
 ```shell
 git clone https://github.com/wr4ng/rusty-pake.git
