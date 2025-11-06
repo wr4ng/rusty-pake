@@ -115,6 +115,8 @@ mod tests {
     use super::*;
     #[test]
     fn distinct_a_b_g() {
+        assert!(!bool::from(a_point().is_identity()));
+        assert!(!bool::from(b_point().is_identity()));
         assert_ne!(a_point(), b_point());
         assert_ne!(a_point(), RistrettoPoint::generator());
         assert_ne!(b_point(), RistrettoPoint::generator());
