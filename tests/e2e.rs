@@ -1,8 +1,21 @@
+use std::sync::Once;
+
 use rusty_pake::{client, server};
 use serial_test::serial;
 
+static INIT: Once = Once::new();
+
 async fn setup_server(id: &str) {
     let id = id.to_string();
+
+    INIT.call_once(|| {
+        tracing_subscriber::fmt()
+            .with_target(false)
+            .with_test_writer() // ensures logs go to test output
+            .compact()
+            .init();
+    });
+
     tokio::spawn(async move {
         server::run("0.0.0.0:3000", &id).await;
     });
