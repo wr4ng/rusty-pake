@@ -35,4 +35,5 @@ async fn main() {
             Err(join_error) => println!("{}", join_error),
         }
     }
+    println!("all clients were successful");
 }
