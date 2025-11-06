@@ -80,7 +80,7 @@ async fn handle_setup(
 
     if sessions.contains_key(&request.id) {
         error!(id = %request.id, "/setup client id is already setup");
-        return Err(StatusCode::BAD_GATEWAY);
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     info!(
