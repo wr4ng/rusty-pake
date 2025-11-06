@@ -1,11 +1,10 @@
 use std::sync::Once;
 
 use rusty_pake::{client, server};
-use serial_test::serial;
 
 static INIT: Once = Once::new();
 
-async fn setup_server(id: &str) {
+async fn setup_server(port: u32, id: &str) {
     let id = id.to_string();
 
     INIT.call_once(|| {
@@ -17,12 +16,17 @@ async fn setup_server(id: &str) {
     });
 
     tokio::spawn(async move {
-        server::run(3000, &id).await;
+        server::run(port, &id).await;
     });
 
     let client = reqwest::Client::new();
     for _ in 0..20 {
-        if client.get("http://localhost:3000/id").send().await.is_ok() {
+        if client
+            .get(format!("http://localhost:{}/id", port))
+            .send()
+            .await
+            .is_ok()
+        {
             return;
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -31,24 +35,22 @@ async fn setup_server(id: &str) {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_get_server_id() {
     let server_id = "test-id";
-    setup_server(server_id).await;
+    setup_server(3000, server_id).await;
 
     let retrieved_id = client::get_server_id("http://localhost:3000").await;
     assert_eq!(retrieved_id.unwrap(), server_id)
 }
 
 #[tokio::test]
-#[serial]
 async fn test_successful_exchange() {
-    let ip = "http://localhost:3000";
+    let ip = "http://localhost:3001";
     let server_id = "id";
     let client_id = "Alice";
     let password = "ilovebob123";
 
-    setup_server(server_id).await;
+    setup_server(3001, server_id).await;
 
     client::perform_setup(ip, server_id, client_id, password)
         .await
@@ -62,14 +64,13 @@ async fn test_successful_exchange() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_wrong_password_exchange() {
-    let ip = "http://localhost:3000";
+    let ip = "http://localhost:3002";
     let server_id = "id";
     let client_id = "Bob";
     let password = "alice1234";
 
-    setup_server(server_id).await;
+    setup_server(3002, server_id).await;
 
     client::perform_setup(ip, server_id, client_id, password)
         .await
@@ -85,14 +86,13 @@ async fn test_wrong_password_exchange() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_multiple_exchanges() {
-    let ip = "http://localhost:3000";
+    let ip = "http://localhost:3003";
     let server_id = "popular-server";
     let client_id = "Bob";
     let password = "alice1234";
 
-    setup_server(server_id).await;
+    setup_server(3003, server_id).await;
 
     client::perform_setup(ip, server_id, client_id, password)
         .await
@@ -118,9 +118,8 @@ async fn test_multiple_exchanges() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_multiple_clients() {
-    let ip = "http://localhost:3000";
+    let ip = "http://localhost:3004";
     let server_id = "id";
 
     let clients = vec![
@@ -130,7 +129,7 @@ async fn test_multiple_clients() {
         ("Eve", "ijustwantfriends123"),
     ];
 
-    setup_server(server_id).await;
+    setup_server(3004, server_id).await;
 
     let handles: Vec<_> = clients
         .into_iter()
