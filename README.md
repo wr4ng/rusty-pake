@@ -1,10 +1,8 @@
 # rusty-pake
-
 **Course**: [02232 Applied Cryptography](https://kurser.dtu.dk/course/02232)
-
 Rust toy implementation of the SPAKE2+ protocol using [`curve25519-dalek`](https://crates.io/crates/curve25519-dalek) as the prime order finite abelian group.
 
-# setup
+# Compilation and Installation
 The following setup steps have been tested on a Ubunto 24.04.3 LTS (slightly newer than the mentioned version).
 
 1. Install fresh Ubuntu VM
@@ -23,7 +21,10 @@ The shell needs to be restarted to make `cargo` available.
 git clone https://github.com/wr4ng/rusty-pake.git
 cd rusty-pake
 ```
-5. Run automated tests:
+Then the setup is complete and the environment is ready to run the application and test cases.
+
+# Running the test cases
+Run automated test-suite:
 ```shell
 cargo test
 ```
@@ -34,21 +35,21 @@ To run the server and client manually, use the following commands (in separate t
 cargo run --bin=server
 cargo run --bin=client
 ```
-![VM example output](./images/vm-example.png)
+
+When running the client locally no URL need to be entered (the default can be used).
+Then enter `setup` and afterwards an id and password.
+Using the same id and password in `exchange` yields a key that is the same the server computes.
+Can be verified using `verify`.
 
 The server id can be controlled using the `SERVER_ID` environment variable:
 ```shell
 SERVER_ID=some-other-id cargo run --bin=server
 ````
 
-A non-interactive example client can be run against the local server using:
-```shell
-cargo run --bin=example-client
-```
-This runs an example flow where a client performs setup, exchange and verification against the server.
+We also provide the following example clients that run against the local server using
+predefined options. These require the server to be running locally in a separate process:
 
-
-This runs multiple clients with multiple rounds of exchange to test the server in a harder scenario:
 ```shell
-cargo run --bin=example-many-clients
+cargo run --bin=example-client        # A single client setup, exchange and verification
+cargo run --bin=example-many-clients  # 4 clients performing setup and then exchange + verify 20 times each
 ```
