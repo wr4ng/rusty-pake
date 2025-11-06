@@ -122,38 +122,33 @@ async fn test_multiple_exchanges() {
 async fn test_multiple_clients() {
     let ip = "http://localhost:3000";
     let server_id = "id";
-    let client_a = "Alice";
-    let password_a = "ilovebob123";
-    let client_b = "Bob";
-    let password_b = "alice1234";
+
+    let clients = vec![
+        ("Alice", "ilovebob123"),
+        ("Bob", "alice1234"),
+        ("Charlie", "thirdwheel!"),
+        ("Eve", "ijustwantfriends123"),
+    ];
 
     setup_server(server_id).await;
 
-    // Alice setup
-    client::perform_setup(ip, server_id, client_a, password_a)
-        .await
-        .unwrap();
+    let handles: Vec<_> = clients
+        .into_iter()
+        .map(|(id, password)| {
+            tokio::spawn(async move {
+                let server_id = client::get_server_id(ip).await.unwrap();
+                client::perform_setup(ip, &server_id, id, password)
+                    .await
+                    .unwrap();
+                let key = client::perform_exchange(ip, &server_id, &id, &password)
+                    .await
+                    .unwrap();
+                assert_eq!(true, client::perform_verify(ip, &id, &key).await.unwrap());
+            })
+        })
+        .collect();
 
-    // Bob setup
-    client::perform_setup(ip, server_id, client_b, password_b)
-        .await
-        .unwrap();
-
-    // Alice exchange
-    let key_a = client::perform_exchange(ip, server_id, client_a, password_a)
-        .await
-        .unwrap();
-
-    // Bob exchange
-    let key_b = client::perform_exchange(ip, server_id, client_b, password_b)
-        .await
-        .unwrap();
-
-    // Alice verify
-    let success_a = client::perform_verify(ip, client_a, &key_a).await.unwrap();
-    assert_eq!(success_a, true);
-
-    // Bob verify
-    let success_b = client::perform_verify(ip, client_b, &key_b).await.unwrap();
-    assert_eq!(success_b, true);
+    for handle in handles {
+        assert!(handle.await.is_ok())
+    }
 }
