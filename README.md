@@ -1,5 +1,6 @@
 # rusty-pake
 **Course**: [02232 Applied Cryptography](https://kurser.dtu.dk/course/02232)
+
 Rust toy implementation of the SPAKE2+ protocol using [`curve25519-dalek`](https://crates.io/crates/curve25519-dalek) as the prime order finite abelian group.
 
 # Compilation and Installation
