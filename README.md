@@ -17,6 +17,7 @@ sudo apt install git curl build-essential libssl-dev pkg-config -y
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 The shell needs to be restarted to make `cargo` available.
+
 4. Clone the project:
 ```shell
 git clone https://github.com/wr4ng/rusty-pake.git
